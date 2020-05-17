@@ -3,30 +3,30 @@ type
 
 
 const
-  Gem10 = GemCode(10)
-  Gem20 = GemCode(20)
-  Gem21 = GemCode(21)
-  Gem30 = GemCode(30)
-  Gem31 = GemCode(31)
-  Gem40 = GemCode(40)
-  Gem41 = GemCode(41)
-  Gem42 = GemCode(42)
-  Gem43 = GemCode(43)
-  Gem44 = GemCode(44)
-  Gem50 = GemCode(50)
-  Gem51 = GemCode(51)
-  Gem52 = GemCode(52)
-  Gem53 = GemCode(53)
-  Gem59 = GemCode(59)
-  Gem60 = GemCode(60)
-  Gem61 = GemCode(61)
-  Gem62 = GemCode(62)
-  Gem63 = GemCode(63)
-  Gem64 = GemCode(64)
-  Gem65 = GemCode(65)
+  Gem10* = GemCode(10)
+  Gem20* = GemCode(20)
+  Gem21* = GemCode(21)
+  Gem30* = GemCode(30)
+  Gem31* = GemCode(31)
+  Gem40* = GemCode(40)
+  Gem41* = GemCode(41)
+  Gem42* = GemCode(42)
+  Gem43* = GemCode(43)
+  Gem44* = GemCode(44)
+  Gem50* = GemCode(50)
+  Gem51* = GemCode(51)
+  Gem52* = GemCode(52)
+  Gem53* = GemCode(53)
+  Gem59* = GemCode(59)
+  Gem60* = GemCode(60)
+  Gem61* = GemCode(61)
+  Gem62* = GemCode(62)
+  Gem63* = GemCode(63)
+  Gem64* = GemCode(64)
+  Gem65* = GemCode(65)
 
 
-proc `$`(code: GemCode): string =
+proc `$`*(code: GemCode): string =
   case code.int
   of 10: "INPUT"
   of 20: "SUCCESS"

@@ -1,6 +1,5 @@
 import asyncdispatch
 import asyncfutures
-import asyncnet
 
 import gemclient    
 

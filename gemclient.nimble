@@ -11,3 +11,10 @@ srcDir        = "src"
 # Dependencies
 
 requires "nim >= 1.2.0"
+
+when defined(nimdistros):
+  import distros
+  if detectOs(Ubuntu):
+    foreignDep "libssl-dev"
+  else:
+    foreignDep "openssl"
