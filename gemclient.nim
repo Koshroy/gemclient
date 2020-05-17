@@ -1,7 +1,7 @@
 import asyncdispatch
 import asyncfutures
 import asyncnet
-import gemcode
+import gemclient/gemcode
 import net
 import re
 import streams
