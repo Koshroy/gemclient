@@ -48,9 +48,10 @@ proc meta*(response: Response | AsyncResponse): string =
     return ""
 
 
-proc body*(response: Response | AsyncResponse): string =
+proc body*(response: Response | AsyncResponse):
+         Future[string] {.multisync.} =
   if response.bodyStr.len == 0:
-    response.bodyStr = response.bodyStream.readAll()
+    response.bodyStr = await response.bodyStream.readAll()
   return response.bodyStr
 
 
