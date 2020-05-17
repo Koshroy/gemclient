@@ -27,12 +27,19 @@ type
     bodyStr: string
     bodyStream*: Stream
 
+type
+  AsyncResponse* = ref object
+    header*: string
+    bodyStr: string
+    bodyStream*: FutureStream[string]
 
-proc code*(response: Response): GemCode {.raises: ValueError.} =
+
+proc code*(response: Response | AsyncResponse):
+         GemCode {.raises: ValueError.} =
   return response.header[0 .. 1].parseInt.GemCode
 
 
-proc meta*(response: Response): string =
+proc meta*(response: Response | AsyncResponse): string =
   var matches : array[1, string]
   let foundMeta = response.header.match(MetaRe, matches, 1)
   if foundMeta:
@@ -41,23 +48,29 @@ proc meta*(response: Response): string =
     return ""
 
 
-proc body*(response: Response): string =
+proc body*(response: Response | AsyncResponse): string =
   if response.bodyStr.len == 0:
-    response.bodyStream.setPosition(0)
     response.bodyStr = response.bodyStream.readAll()
   return response.bodyStr
 
 
 type
-  GeminiClient = ref object
-    socket: Socket
+  GeminiClientBase*[SocketType] = ref object
+    socket: SocketType
     currentURL: Uri
     maxRedirects: Natural
     timeout*: int
     sslContext: net.SslContext
-    bodyStream: Stream
+    when SocketType is AsyncSocket:
+      bodyStream: FutureStream[string]
+      parseBodyFut: Future[void]
+    else:
+      bodyStream: Stream
     body: string
 
+
+type
+  GeminiClient* = GeminiClientBase[Socket]
 
 proc newGeminiClient*(maxRedirects = 5,
                      sslContext = getDefaultSSL()): GeminiClient =
@@ -66,8 +79,20 @@ proc newGeminiClient*(maxRedirects = 5,
   result.sslContext = sslContext
   result.bodyStream = newStringStream("")
 
+type
+  AsyncGeminiClient* = GeminiClientBase[AsyncSocket]
 
-proc sendRequest(client: GeminiClient, url: string) =
+
+proc newAsyncGeminiClient*(maxRedirects = 5,
+                     sslContext = getDefaultSSL()): AsyncGeminiClient =
+  new result
+  result.maxRedirects = maxRedirects
+  result.sslContext = sslContext
+  result.bodyStream = newFutureStream[string]("newAsyncGeminiClient")
+
+
+proc sendRequest(client: GeminiClient | AsyncGeminiClient, url: string):
+                Future[void] {.multisync.} =
   # Should we set the client current URL to the post
   # cleaned up values in the logic below?
   let requestUrl = parseUri(url)
@@ -88,39 +113,51 @@ proc sendRequest(client: GeminiClient, url: string) =
     else:
       Port(requestUrl.port.parseInt)
 
-  client.socket = newSocket()
+  when client is AsyncGeminiClient:
+    client.socket = newAsyncSocket()
+  else:
+    client.socket = newSocket()
   client.sslContext.wrapSocket(client.socket)
-  client.socket.connect(hostname, port)
-  client.socket.send($requestUrl & "\x0d\x0a")
+  await client.socket.connect(hostname, port)
+  await client.socket.send($requestUrl & "\x0d\x0a")
 
 
-proc parseResponse(client: GeminiClient): Response =
+proc parseResponse(client: GeminiClient | AsyncGeminiClient):
+                  Future[Response | AsyncResponse] {.multisync.} =
   new result
   var parsedHeader = false
   var line = "initial"
   while line != "":
-    line = client.socket.recvLine()
+    line = await client.socket.recvLine()
     if not parsedHeader:
       result.header = line
       parsedHeader = true
-      client.bodyStream = newStringStream()
+      when client is AsyncGeminiClient:
+        client.bodyStream = newFutureStream[string]("newAsyncGeminiClient")
+      else:
+        client.bodyStream = newStringStream()
       result.bodyStream = client.bodyStream
       continue
-    client.bodyStream.writeLine(line)
+    await client.bodyStream.write(line & "\n")
+  when client is AsyncGeminiClient:
+    result.bodyStream.complete()
+  else:
+    result.bodyStream.setPosition(0)
 
 
-proc fetch*(client: GeminiClient, url: string): Response =
-  client.sendRequest(url)
+proc fetch*(client: GeminiClient | AsyncGeminiClient, url: string):
+          Future[Response | AsyncResponse] {.multisync.} =
+  await client.sendRequest(url)
 
   var redirCount = 0
-  var response = parseResponse(client)
+  var response = await parseResponse(client)
   while response.code.redirection:
     redirCount += 1
     if redirCount >= client.maxRedirects:
       break
     client.socket.close()
-    client.sendRequest(response.meta)
-    response = parseResponse(client)
+    await client.sendRequest(response.meta)
+    response = await parseResponse(client)
     
   client.socket.close()
   return response
